@@ -153,8 +153,8 @@ class RecorderService : Service() {
     private fun stopRecording() {
         var ok = false
         recorder?.let { mr ->
-            try { mr.stop(); ok = true } catch (_: RuntimeException) { }
-            try { mr.reset() } catch (_: Exception) { }
+            try { mr.stop(); ok = true } catch (e: RuntimeException) { }
+            try { mr.reset() } catch (e: Exception) { }
             mr.release()
         }
         recorder = null
@@ -169,7 +169,7 @@ class RecorderService : Service() {
         projection = null
         projectionCallback = null
 
-        try { pfd?.close() } catch (_: Exception) { }
+        try { pfd?.close() } catch (e: Exception) { }
         pfd = null
 
         uri?.let { u ->
