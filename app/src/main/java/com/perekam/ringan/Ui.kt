@@ -125,6 +125,10 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
                         s.fps, !recording,
                     ) { update(s.copy(fps = it)) }
                     Option(
+                        "Codec video", listOf("H.264" to 264, "H.265" to 265),
+                        s.codec, !recording,
+                    ) { update(s.copy(codec = it)) }
+                    Option(
                         "Bitrate",
                         listOf("4 Mbps" to 4, "8 Mbps" to 8, "12 Mbps" to 12, "16 Mbps" to 16),
                         s.bitrateMbps, !recording,
