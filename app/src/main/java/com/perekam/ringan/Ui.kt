@@ -68,10 +68,11 @@ fun AppTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
+fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) -> Unit) {
     val ctx = LocalContext.current
     var s by remember { mutableStateOf(Prefs.load(ctx)) }
     val startedAt by RecorderState.startedAt.collectAsState()
+    val floating by OverlayState.enabled.collectAsState()
     val recording = startedAt != 0L
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
 
@@ -135,6 +136,31 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
                         "Codec video", listOf("H.264" to 264, "H.265" to 265),
                         s.codec, !recording,
                     ) { update(s.copy(codec = it)) }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Tombol rekam melayang", style = MaterialTheme.typography.bodyLarge)
+                        Switch(floating, onFloating)
+                    }
+                    Text(
+                        "Tombol merah di tengah layar. Ketuk untuk mulai merekam, lalu tombol hilang. " +
+                            "Berhenti lewat tombol di notifikasi. Tombol bisa digeser.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
