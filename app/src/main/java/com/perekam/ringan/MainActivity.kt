@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
             .putExtra(EXTRA_FPS, s.fps)
             .putExtra(EXTRA_MBPS, s.bitrateMbps)
             .putExtra(EXTRA_MIC, s.mic)
+            .putExtra(EXTRA_CODEC, s.codec)
         ContextCompat.startForegroundService(this, i)
         moveTaskToBack(true) // langsung kembali ke game/aplikasi sebelumnya
     }
