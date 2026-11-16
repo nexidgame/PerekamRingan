@@ -9,6 +9,7 @@ data class RecSettings(
     val fps: Int = 30,
     val bitrateMbps: Int = 8,
     val mic: Boolean = false,
+    val codec: Int = 264, // 264 = H.264, 265 = H.265
 )
 
 object Prefs {
@@ -21,6 +22,7 @@ object Prefs {
             fps = s.getInt("fps", 30),
             bitrateMbps = s.getInt("mbps", 8),
             mic = s.getBoolean("mic", false),
+            codec = s.getInt("codec", 264),
         )
     }
 
@@ -30,6 +32,7 @@ object Prefs {
             .putInt("fps", r.fps)
             .putInt("mbps", r.bitrateMbps)
             .putBoolean("mic", r.mic)
+            .putInt("codec", r.codec)
             .apply()
     }
 }
