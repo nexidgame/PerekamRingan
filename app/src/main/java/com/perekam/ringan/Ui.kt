@@ -20,8 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -121,25 +122,72 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
                         s.shortSide, !recording,
                     ) { update(s.copy(shortSide = it)) }
                     Option(
-                        "Frame rate", listOf("30 fps" to 30, "60 fps" to 60, "90 fps" to 90, "120 fps" to 120),
+                        "Frame rate",
+                        listOf("30 fps" to 30, "60 fps" to 60, "90 fps" to 90, "120 fps" to 120),
                         s.fps, !recording,
                     ) { update(s.copy(fps = it)) }
-                    Option(
-                        "Codec video", listOf("H.264" to 264, "H.265" to 265),
-                        s.codec, !recording,
-                    ) { update(s.copy(codec = it)) }
                     Option(
                         "Bitrate",
                         listOf("4 Mbps" to 4, "8 Mbps" to 8, "12 Mbps" to 12, "16 Mbps" to 16),
                         s.bitrateMbps, !recording,
                     ) { update(s.copy(bitrateMbps = it)) }
+                    Option(
+                        "Codec video", listOf("H.264" to 264, "H.265" to 265),
+                        s.codec, !recording,
+                    ) { update(s.copy(codec = it)) }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Rekam suara mikrofon", style = MaterialTheme.typography.bodyLarge)
-                        Switch(s.mic, { update(s.copy(mic = it)) }, enabled = !recording)
+                        Text("Rekam audio", style = MaterialTheme.typography.bodyLarge)
+                        Switch(s.audioOn, { update(s.copy(audioOn = it)) }, enabled = !recording)
+                    }
+                    if (s.audioOn) {
+                        Option(
+                            "Sumber suara",
+                            listOf(
+                                "MIC" to SRC_MIC, "Raw" to SRC_RAW,
+                                "Performa" to SRC_PERF, "Internal" to SRC_INTERNAL,
+                            ),
+                            s.audioSource, !recording,
+                        ) { update(s.copy(audioSource = it)) }
+                        Text(
+                            when (s.audioSource) {
+                                SRC_RAW -> "Raw: mikrofon tanpa terproses (tanpa peredam noise dan penguat otomatis)."
+                                SRC_PERF -> "Performa Suara: mikrofon dengan latensi rendah."
+                                SRC_INTERNAL -> "Suara Internal: merekam suara dari HP (game/media), bukan mikrofon. " +
+                                    "Sebagian aplikasi memblokirnya, dan video disatukan saat berhenti."
+                                else -> "MIC: mikrofon standar."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Option(
+                            "Tingkat sampel audio",
+                            listOf("44100 Hz" to 44100, "48000 Hz" to 48000),
+                            s.sampleRate, !recording,
+                        ) { update(s.copy(sampleRate = it)) }
+                        Option(
+                            "Saluran audio", listOf("Mono" to 1, "Stereo" to 2),
+                            s.channels, !recording,
+                        ) { update(s.copy(channels = it)) }
+                        Option(
+                            "Enkoder audio",
+                            listOf("AAC" to 0, "AAC_ELD" to 1, "HE-AAC" to 2),
+                            s.audioCodec, !recording,
+                        ) { update(s.copy(audioCodec = it)) }
                     }
                 }
             }
@@ -202,7 +250,15 @@ private fun <T> Option(
                     onClick = { onSelect(value) },
                     shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     enabled = enabled,
-                    label = { Text(label, maxLines = 1) },
+                    icon = {},
+                    label = {
+                        Text(
+                            label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    },
                 )
             }
         }
