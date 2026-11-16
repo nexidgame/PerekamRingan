@@ -15,11 +15,17 @@ Perekam layar minimalis untuk Android 11 (API 30) sampai Android 16 (API 36).
 ## Fitur
 Resolusi (480p/720p/1080p/asli), 30/60/90/120 fps, bitrate 4-16 Mbps,
 codec H.264 atau H.265 (otomatis kembali ke H.264 jika HP tidak mendukung H.265),
-mikrofon opsional.
+audio opsional dengan pilihan:
+- Sumber suara: MIC, Raw (tanpa terproses), Performa Suara, atau Suara Internal
+- Tingkat sampel: 44100 Hz atau 48000 Hz
+- Saluran: mono atau stereo
+- Enkoder: AAC, AAC_ELD, atau HE-AAC
+Jika kombinasi audio tidak didukung HP, aplikasi otomatis memakai AAC (dan MIC untuk sumber mikrofon).
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
 
 ## Catatan Android 14-16
 Foreground service bertipe mediaProjection dimulai sebelum getMediaProjection(),
 callback didaftarkan sebelum createVirtualDisplay(), dan UI edge-to-edge.
-Audio internal (suara game) tidak disertakan karena butuh AudioPlaybackCapture
-dan menambah beban; hanya mikrofon.
+Suara Internal memakai AudioPlaybackCapture: direkam terpisah lalu digabung dengan video
+saat berhenti, jadi ada jeda singkat untuk menyimpan. Aplikasi/game yang melarang
+perekaman audio akan menghasilkan suara kosong.
