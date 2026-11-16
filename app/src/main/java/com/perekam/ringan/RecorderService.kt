@@ -88,7 +88,7 @@ class RecorderService : Service() {
                 ?: error("Tidak ada data izin")
 
             val mpm = getSystemService(MediaProjectionManager::class.java)
-            val proj = mpm.getMediaProjection(code, data)
+            val proj = mpm.getMediaProjection(code, data) ?: error("Gagal mendapat izin rekam layar")
             projection = proj
             val cb = object : MediaProjection.Callback() {
                 override fun onStop() {
