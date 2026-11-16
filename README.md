@@ -8,12 +8,14 @@ Perekam layar minimalis untuk Android 11 (API 30) sampai Android 16 (API 36).
 3. Setelah sync pertama, Android Studio membuat file gradle-wrapper.jar sendiri.
 
 ## Kenapa ringan
-- MediaRecorder + encoder H.264 hardware: frame dari layar langsung ke encoder, tanpa proses di CPU.
+- MediaRecorder + encoder hardware (H.264 atau H.265): frame dari layar langsung ke encoder, tanpa proses di CPU.
 - Tidak ada overlay, widget melayang, kamera, atau penggambaran sentuhan.
 - UI hanya aktif saat aplikasi dibuka; saat merekam, aplikasi langsung ke latar belakang.
 
 ## Fitur
-Resolusi (480p/720p/1080p/asli), 30/60/90/120 fps, bitrate 4-16 Mbps, mikrofon opsional.
+Resolusi (480p/720p/1080p/asli), 30/60/90/120 fps, bitrate 4-16 Mbps,
+codec H.264 atau H.265 (otomatis kembali ke H.264 jika HP tidak mendukung H.265),
+mikrofon opsional.
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
 
 ## Catatan Android 14-16
