@@ -121,7 +121,7 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
                         s.shortSide, !recording,
                     ) { update(s.copy(shortSide = it)) }
                     Option(
-                        "Frame rate", listOf("30 fps" to 30, "60 fps" to 60),
+                        "Frame rate", listOf("30 fps" to 30, "60 fps" to 60, "90 fps" to 90, "120 fps" to 120),
                         s.fps, !recording,
                     ) { update(s.copy(fps = it)) }
                     Option(
