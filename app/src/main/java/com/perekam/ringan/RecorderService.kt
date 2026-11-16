@@ -119,11 +119,11 @@ class RecorderService : Service() {
             projectionCallback = cb
             proj.registerCallback(cb, main) // wajib sebelum createVirtualDisplay (Android 14+)
 
-            val (vw, vh) = scaled(
-                intent.getIntExtra(EXTRA_W, 720),
-                intent.getIntExtra(EXTRA_H, 1280),
-                intent.getIntExtra(EXTRA_SIDE, 720),
-            )
+            val rawW = intent.getIntExtra(EXTRA_W, 720)
+            val rawH = intent.getIntExtra(EXTRA_H, 1280)
+            val side = intent.getIntExtra(EXTRA_SIDE, 720)
+            // Ukuran tepat (genap) lebih dulu; jika encoder menolak, dicoba kelipatan 16.
+            var (vw, vh) = scaled(rawW, rawH, side, 2)
             val fps = intent.getIntExtra(EXTRA_FPS, 30)
             val mbps = intent.getIntExtra(EXTRA_MBPS, 8)
             val dpi = intent.getIntExtra(EXTRA_DPI, 320)
@@ -189,15 +189,25 @@ class RecorderService : Service() {
                 outPath = v.absolutePath
             }
 
-            val mr = try {
-                newRecorder(vw, vh, fps, mbps, useHevc, micSource, sampleRate, channels, encoder, outPath, fd.fileDescriptor)
+            fun build(w: Int, h: Int): MediaRecorder = try {
+                newRecorder(w, h, fps, mbps, useHevc, micSource, sampleRate, channels, encoder, outPath, fd.fileDescriptor)
             } catch (e: Exception) {
                 if (micSource == null) throw e
                 Toast.makeText(this, "Pengaturan audio tidak didukung, memakai MIC + AAC", Toast.LENGTH_LONG).show()
                 newRecorder(
-                    vw, vh, fps, mbps, useHevc, MediaRecorder.AudioSource.MIC, sampleRate, channels,
+                    w, h, fps, mbps, useHevc, MediaRecorder.AudioSource.MIC, sampleRate, channels,
                     MediaRecorder.AudioEncoder.AAC, outPath, fd.fileDescriptor,
                 )
+            }
+
+            val mr = try {
+                build(vw, vh)
+            } catch (e: Exception) {
+                val (aw, ah) = scaled(rawW, rawH, side, 16)
+                if (aw == vw && ah == vh) throw e
+                vw = aw
+                vh = ah
+                build(vw, vh)
             }
             recorder = mr
 
@@ -351,11 +361,11 @@ class RecorderService : Service() {
                 info.supportedTypes.any { it.equals("video/hevc", ignoreCase = true) }
         }
 
-    /** Skala ke sisi pendek [side], dibulatkan ke kelipatan 16 agar aman bagi encoder. */
-    private fun scaled(w: Int, h: Int, side: Int): Pair<Int, Int> {
+    /** Skala ke sisi pendek [side], dibulatkan ke kelipatan [step] (2 = ukuran tepat, 16 = aman bagi encoder). */
+    private fun scaled(w: Int, h: Int, side: Int, step: Int): Pair<Int, Int> {
         val shortSide = min(w, h)
         val f = if (side in 1 until shortSide) side.toFloat() / shortSide else 1f
-        fun align(v: Int) = max(16, (v * f / 16f).roundToInt() * 16)
+        fun align(v: Int) = max(step, (v * f / step).roundToInt() * step)
         return align(w) to align(h)
     }
 
