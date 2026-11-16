@@ -39,6 +39,12 @@ object Prefs {
         )
     }
 
+    fun floating(c: Context): Boolean = sp(c).getBoolean("floating", false)
+
+    fun setFloating(c: Context, on: Boolean) {
+        sp(c).edit().putBoolean("floating", on).apply()
+    }
+
     fun save(c: Context, r: RecSettings) {
         sp(c).edit()
             .putInt("side", r.shortSide)
