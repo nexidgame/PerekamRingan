@@ -20,6 +20,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug") // agar APK rilis bisa langsung dipasang
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -30,6 +31,24 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+
+    // Pemangkasan ukuran: buang metadata dan berkas yang tidak dipakai saat aplikasi berjalan
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+    packaging {
+        resources {
+            excludes += listOf(
+                "/DebugProbesKt.bin",
+                "/kotlin-tooling-metadata.json",
+                "/META-INF/*.version",
+                "/META-INF/*.kotlin_module",
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/licenses/**",
+            )
+        }
+    }
 }
 
 dependencies {
