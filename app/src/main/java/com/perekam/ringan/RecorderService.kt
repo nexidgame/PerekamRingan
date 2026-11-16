@@ -29,6 +29,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import java.io.File
+import java.io.FileDescriptor
+import java.io.FileInputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,8 +49,12 @@ const val EXTRA_DPI = "dpi"
 const val EXTRA_SIDE = "side"
 const val EXTRA_FPS = "fps"
 const val EXTRA_MBPS = "mbps"
-const val EXTRA_MIC = "mic"
 const val EXTRA_CODEC = "codec"
+const val EXTRA_AUDIO = "audio"
+const val EXTRA_ASRC = "asrc"
+const val EXTRA_ARATE = "arate"
+const val EXTRA_ACH = "ach"
+const val EXTRA_ACODEC = "acodec"
 
 class RecorderService : Service() {
 
@@ -57,7 +64,12 @@ class RecorderService : Service() {
     private var recorder: MediaRecorder? = null
     private var pfd: ParcelFileDescriptor? = null
     private var uri: Uri? = null
+    private var internalAudio: InternalAudioRecorder? = null
+    private var videoTmp: File? = null
+    private var audioTmp: File? = null
     private val main = Handler(Looper.getMainLooper())
+
+    @Volatile private var saving = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -71,9 +83,12 @@ class RecorderService : Service() {
     }
 
     private fun start(intent: Intent) {
-        val micOk = intent.getBooleanExtra(EXTRA_MIC, false) &&
+        val audioOn = intent.getBooleanExtra(EXTRA_AUDIO, false) &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
+        val src = intent.getIntExtra(EXTRA_ASRC, SRC_MIC)
+        val internal = audioOn && src == SRC_INTERNAL
+        val micOk = audioOn && !internal
 
         // Android 14+: foreground service bertipe mediaProjection harus aktif
         // sebelum getMediaProjection() dipanggil.
@@ -82,6 +97,10 @@ class RecorderService : Service() {
         createChannel()
         ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(), type)
 
+        if (saving) {
+            Toast.makeText(this, "Masih menyimpan video sebelumnya", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (recorder != null) return
 
         try {
@@ -108,6 +127,9 @@ class RecorderService : Service() {
             val fps = intent.getIntExtra(EXTRA_FPS, 30)
             val mbps = intent.getIntExtra(EXTRA_MBPS, 8)
             val dpi = intent.getIntExtra(EXTRA_DPI, 320)
+            val sampleRate = intent.getIntExtra(EXTRA_ARATE, 44100)
+            val channels = intent.getIntExtra(EXTRA_ACH, 1)
+            val acodec = intent.getIntExtra(EXTRA_ACODEC, 0)
 
             val name = "Rec_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val values = ContentValues().apply {
@@ -122,30 +144,62 @@ class RecorderService : Service() {
             val fd = contentResolver.openFileDescriptor(u, "rw") ?: error("Gagal membuka file")
             pfd = fd
 
-            val mr = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this)
-            else @Suppress("DEPRECATION") MediaRecorder()
-            recorder = mr
-            if (micOk) mr.setAudioSource(MediaRecorder.AudioSource.MIC)
-            mr.setVideoSource(MediaRecorder.VideoSource.SURFACE)
-            mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             val wantHevc = intent.getIntExtra(EXTRA_CODEC, 264) == 265
             val useHevc = wantHevc && hasHardwareHevcEncoder()
             if (wantHevc && !useHevc) {
                 Toast.makeText(this, "H.265 tidak didukung HP ini, memakai H.264", Toast.LENGTH_LONG).show()
             }
-            mr.setVideoEncoder(
-                if (useHevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264,
-            )
-            if (micOk) {
-                mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                mr.setAudioEncodingBitRate(128_000)
-                mr.setAudioSamplingRate(44_100)
+
+            // Suara internal direkam terpisah, lalu digabung dengan video saat berhenti.
+            var ia: InternalAudioRecorder? = null
+            if (internal) {
+                val aTmp = File(cacheDir, "audio_$name.m4a")
+                val cand = InternalAudioRecorder(proj, sampleRate, channels, acodec, aTmp)
+                try {
+                    cand.prepare()
+                    ia = cand
+                    audioTmp = aTmp
+                } catch (e: Exception) {
+                    cand.release()
+                    aTmp.delete()
+                    Toast.makeText(
+                        this, "Suara internal gagal disiapkan, merekam tanpa suara", Toast.LENGTH_LONG,
+                    ).show()
+                }
             }
-            mr.setVideoSize(vw, vh)
-            mr.setVideoFrameRate(fps)
-            mr.setVideoEncodingBitRate(mbps * 1_000_000)
-            mr.setOutputFile(fd.fileDescriptor)
-            mr.prepare()
+            internalAudio = ia
+
+            val micSource: Int? = if (micOk) {
+                when (src) {
+                    SRC_RAW -> MediaRecorder.AudioSource.UNPROCESSED
+                    SRC_PERF -> MediaRecorder.AudioSource.VOICE_PERFORMANCE
+                    else -> MediaRecorder.AudioSource.MIC
+                }
+            } else null
+            val encoder = when (acodec) {
+                1 -> MediaRecorder.AudioEncoder.AAC_ELD
+                2 -> MediaRecorder.AudioEncoder.HE_AAC
+                else -> MediaRecorder.AudioEncoder.AAC
+            }
+
+            var outPath: String? = null
+            if (ia != null) {
+                val v = File(cacheDir, "video_$name.mp4")
+                videoTmp = v
+                outPath = v.absolutePath
+            }
+
+            val mr = try {
+                newRecorder(vw, vh, fps, mbps, useHevc, micSource, sampleRate, channels, encoder, outPath, fd.fileDescriptor)
+            } catch (e: Exception) {
+                if (micSource == null) throw e
+                Toast.makeText(this, "Pengaturan audio tidak didukung, memakai MIC + AAC", Toast.LENGTH_LONG).show()
+                newRecorder(
+                    vw, vh, fps, mbps, useHevc, MediaRecorder.AudioSource.MIC, sampleRate, channels,
+                    MediaRecorder.AudioEncoder.AAC, outPath, fd.fileDescriptor,
+                )
+            }
+            recorder = mr
 
             display = proj.createVirtualDisplay(
                 "perekam", vw, vh, dpi,
@@ -153,13 +207,60 @@ class RecorderService : Service() {
                 mr.surface, null, null,
             )
             mr.start()
+            try {
+                ia?.start()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Suara internal gagal dimulai", Toast.LENGTH_LONG).show()
+            }
             RecorderState.startedAt.value = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
             stopRecording()
         }
     }
 
+    private fun newRecorder(
+        vw: Int, vh: Int, fps: Int, mbps: Int, hevc: Boolean,
+        micSource: Int?, sampleRate: Int, channels: Int, audioEncoder: Int,
+        outPath: String?, outFd: FileDescriptor,
+    ): MediaRecorder {
+        val mr = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this)
+        else @Suppress("DEPRECATION") MediaRecorder()
+        try {
+            if (micSource != null) mr.setAudioSource(micSource)
+            mr.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+            mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            mr.setVideoEncoder(
+                if (hevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264,
+            )
+            if (micSource != null) {
+                mr.setAudioEncoder(audioEncoder)
+                mr.setAudioChannels(channels)
+                mr.setAudioSamplingRate(sampleRate)
+                var br = if (channels == 2) 192_000 else 128_000
+                if (audioEncoder == MediaRecorder.AudioEncoder.HE_AAC) br /= 2
+                mr.setAudioEncodingBitRate(br)
+            }
+            mr.setVideoSize(vw, vh)
+            mr.setVideoFrameRate(fps)
+            mr.setVideoEncodingBitRate(mbps * 1_000_000)
+            if (outPath != null) mr.setOutputFile(outPath) else mr.setOutputFile(outFd)
+            mr.prepare()
+            return mr
+        } catch (e: Exception) {
+            mr.release()
+            throw e
+        }
+    }
+
     private fun stopRecording() {
+        if (recorder == null && projection == null && uri == null) {
+            if (!saving) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+            return
+        }
+
         var ok = false
         recorder?.let { mr ->
             try { mr.stop(); ok = true } catch (e: RuntimeException) { }
@@ -178,10 +279,53 @@ class RecorderService : Service() {
         projection = null
         projectionCallback = null
 
-        try { pfd?.close() } catch (e: Exception) { }
-        pfd = null
+        val ia = internalAudio
+        internalAudio = null
+        ia?.stop()
 
-        uri?.let { u ->
+        val vTmp = videoTmp
+        val aTmp = audioTmp
+        videoTmp = null
+        audioTmp = null
+        val fd = pfd
+        val u = uri
+        pfd = null
+        uri = null
+
+        RecorderState.startedAt.value = 0L
+
+        if (ia != null && ok && vTmp != null && aTmp != null && fd != null && u != null) {
+            // Gabungkan video + suara internal di thread terpisah agar tidak menahan UI.
+            saving = true
+            Thread {
+                val success = try {
+                    if (ia.hasAudio) muxVideoAudio(vTmp, aTmp, fd.fileDescriptor)
+                    else copyVideoOnly(vTmp, fd)
+                    true
+                } catch (e: Exception) {
+                    try { copyVideoOnly(vTmp, fd); true } catch (e2: Exception) { false }
+                }
+                vTmp.delete()
+                aTmp.delete()
+                main.post { finishRecording(success, fd, u) }
+            }.start()
+        } else {
+            vTmp?.delete()
+            aTmp?.delete()
+            finishRecording(ia == null && ok, fd, u)
+        }
+    }
+
+    private fun copyVideoOnly(video: File, fd: ParcelFileDescriptor) {
+        ParcelFileDescriptor.AutoCloseOutputStream(fd).use { out ->
+            out.channel.truncate(0)
+            FileInputStream(video).use { it.copyTo(out) }
+        }
+    }
+
+    private fun finishRecording(ok: Boolean, fd: ParcelFileDescriptor?, u: Uri?) {
+        try { fd?.close() } catch (e: Exception) { }
+        if (u != null) {
             if (ok) {
                 val v = ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }
                 contentResolver.update(u, v, null, null)
@@ -191,9 +335,7 @@ class RecorderService : Service() {
                 Toast.makeText(this, R.string.failed, Toast.LENGTH_SHORT).show()
             }
         }
-        uri = null
-
-        RecorderState.startedAt.value = 0L
+        saving = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
