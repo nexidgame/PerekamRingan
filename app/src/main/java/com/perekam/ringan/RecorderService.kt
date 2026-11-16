@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.MediaCodecList
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -46,6 +47,7 @@ const val EXTRA_SIDE = "side"
 const val EXTRA_FPS = "fps"
 const val EXTRA_MBPS = "mbps"
 const val EXTRA_MIC = "mic"
+const val EXTRA_CODEC = "codec"
 
 class RecorderService : Service() {
 
@@ -126,7 +128,14 @@ class RecorderService : Service() {
             if (micOk) mr.setAudioSource(MediaRecorder.AudioSource.MIC)
             mr.setVideoSource(MediaRecorder.VideoSource.SURFACE)
             mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            mr.setVideoEncoder(MediaRecorder.VideoEncoder.H264) // encoder hardware
+            val wantHevc = intent.getIntExtra(EXTRA_CODEC, 264) == 265
+            val useHevc = wantHevc && hasHardwareHevcEncoder()
+            if (wantHevc && !useHevc) {
+                Toast.makeText(this, "H.265 tidak didukung HP ini, memakai H.264", Toast.LENGTH_LONG).show()
+            }
+            mr.setVideoEncoder(
+                if (useHevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264,
+            )
             if (micOk) {
                 mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 mr.setAudioEncodingBitRate(128_000)
@@ -193,6 +202,12 @@ class RecorderService : Service() {
         if (recorder != null) stopRecording()
         super.onDestroy()
     }
+
+    private fun hasHardwareHevcEncoder(): Boolean =
+        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
+            info.isEncoder && info.isHardwareAccelerated &&
+                info.supportedTypes.any { it.equals("video/hevc", ignoreCase = true) }
+        }
 
     /** Skala ke sisi pendek [side], dibulatkan ke kelipatan 16 agar aman bagi encoder. */
     private fun scaled(w: Int, h: Int, side: Int): Pair<Int, Int> {
