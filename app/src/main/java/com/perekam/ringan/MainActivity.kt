@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,7 +19,10 @@ class MainActivity : ComponentActivity() {
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
             val data = r.data
-            if (r.resultCode == RESULT_OK && data != null) beginService(r.resultCode, data)
+            if (r.resultCode == RESULT_OK && data != null) {
+                startRecordingService(r.resultCode, data)
+                moveTaskToBack(true) // langsung kembali ke game/aplikasi sebelumnya
+            }
         }
 
     private val permissionLauncher =
@@ -25,11 +30,25 @@ class MainActivity : ComponentActivity() {
             askProjection() // lanjut walau izin ditolak; audio otomatis dimatikan jika ditolak
         }
 
+    private val overlayPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (Settings.canDrawOverlays(this)) setFloating(true)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Pulihkan tombol melayang jika sebelumnya diaktifkan dan izinnya masih ada.
+        if (Prefs.floating(this) && Settings.canDrawOverlays(this)) setFloating(true)
+        else OverlayState.enabled.value = false
         setContent {
-            AppTheme { MainScreen(onStart = ::onStartClicked, onStop = ::onStopClicked) }
+            AppTheme {
+                MainScreen(
+                    onStart = ::onStartClicked,
+                    onStop = ::onStopClicked,
+                    onFloating = ::onFloatingChanged,
+                )
+            }
         }
     }
 
@@ -53,30 +72,27 @@ class MainActivity : ComponentActivity() {
         projectionLauncher.launch(mpm.createScreenCaptureIntent())
     }
 
-    private fun beginService(code: Int, data: Intent) {
-        val s = Prefs.load(this)
-        val b = windowManager.maximumWindowMetrics.bounds
-        val i = Intent(this, RecorderService::class.java)
-            .setAction(ACTION_START)
-            .putExtra(EXTRA_CODE, code)
-            .putExtra(EXTRA_DATA, data)
-            .putExtra(EXTRA_W, b.width())
-            .putExtra(EXTRA_H, b.height())
-            .putExtra(EXTRA_DPI, resources.configuration.densityDpi)
-            .putExtra(EXTRA_SIDE, s.shortSide)
-            .putExtra(EXTRA_FPS, s.fps)
-            .putExtra(EXTRA_MBPS, s.bitrateMbps)
-            .putExtra(EXTRA_CODEC, s.codec)
-            .putExtra(EXTRA_AUDIO, s.audioOn)
-            .putExtra(EXTRA_ASRC, s.audioSource)
-            .putExtra(EXTRA_ARATE, s.sampleRate)
-            .putExtra(EXTRA_ACH, s.channels)
-            .putExtra(EXTRA_ACODEC, s.audioCodec)
-        ContextCompat.startForegroundService(this, i)
-        moveTaskToBack(true) // langsung kembali ke game/aplikasi sebelumnya
-    }
-
     private fun onStopClicked() {
         startService(Intent(this, RecorderService::class.java).setAction(ACTION_STOP))
+    }
+
+    private fun onFloatingChanged(on: Boolean) {
+        if (!on) {
+            setFloating(false)
+        } else if (Settings.canDrawOverlays(this)) {
+            setFloating(true)
+        } else {
+            // Buka pengaturan "Tampil di atas aplikasi lain"; saat kembali, tombol diaktifkan jika diizinkan.
+            overlayPermissionLauncher.launch(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
+            )
+        }
+    }
+
+    private fun setFloating(on: Boolean) {
+        Prefs.setFloating(this, on)
+        OverlayState.enabled.value = on
+        val svc = Intent(this, OverlayService::class.java)
+        if (on) ContextCompat.startForegroundService(this, svc) else stopService(svc)
     }
 }
