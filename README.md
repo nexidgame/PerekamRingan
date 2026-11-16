@@ -9,7 +9,7 @@ Perekam layar minimalis untuk Android 11 (API 30) sampai Android 16 (API 36).
 
 ## Kenapa ringan
 - MediaRecorder + encoder hardware (H.264 atau H.265): frame dari layar langsung ke encoder, tanpa proses di CPU.
-- Tidak ada overlay, widget melayang, kamera, atau penggambaran sentuhan.
+- Tidak ada kamera atau penggambaran sentuhan. Tombol melayang bersifat opsional dan hilang saat merekam.
 - UI hanya aktif saat aplikasi dibuka; saat merekam, aplikasi langsung ke latar belakang.
 
 ## Fitur
@@ -22,6 +22,13 @@ audio opsional dengan pilihan:
 - Enkoder: AAC, AAC_ELD, atau HE-AAC
 Jika kombinasi audio tidak didukung HP, aplikasi otomatis memakai AAC (dan MIC untuk sumber mikrofon).
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
+
+## Tombol rekam melayang
+Aktifkan saklar "Tombol rekam melayang" di aplikasi (butuh izin "Tampil di atas aplikasi lain").
+Tombol merah muncul di tengah layar dan bisa digeser. Ketuk untuk mulai merekam; tombol langsung
+hilang sehingga tidak ikut terekam, dan muncul lagi setelah rekaman selesai disimpan.
+Berhenti lewat tombol Berhenti di notifikasi. Android tetap menampilkan dialog izin rekam layar
+setiap kali rekaman dimulai.
 
 ## Catatan Android 14-16
 Foreground service bertipe mediaProjection dimulai sebelum getMediaProjection(),
