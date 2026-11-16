@@ -265,6 +265,7 @@ class RecorderService : Service() {
     private fun stopRecording() {
         if (recorder == null && projection == null && uri == null) {
             if (!saving) {
+                OverlayState.busy.value = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -334,6 +335,7 @@ class RecorderService : Service() {
     }
 
     private fun finishRecording(ok: Boolean, fd: ParcelFileDescriptor?, u: Uri?) {
+        OverlayState.busy.value = false
         try { fd?.close() } catch (e: Exception) { }
         if (u != null) {
             if (ok) {
