@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            askProjection() // lanjut walau izin ditolak; mikrofon otomatis dimatikan jika ditolak
+            askProjection() // lanjut walau izin ditolak; audio otomatis dimatikan jika ditolak
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
             need += Manifest.permission.POST_NOTIFICATIONS
         }
-        if (s.mic && !granted(Manifest.permission.RECORD_AUDIO)) {
+        if (s.audioOn && !granted(Manifest.permission.RECORD_AUDIO)) {
             need += Manifest.permission.RECORD_AUDIO
         }
         if (need.isEmpty()) askProjection() else permissionLauncher.launch(need.toTypedArray())
@@ -66,8 +66,12 @@ class MainActivity : ComponentActivity() {
             .putExtra(EXTRA_SIDE, s.shortSide)
             .putExtra(EXTRA_FPS, s.fps)
             .putExtra(EXTRA_MBPS, s.bitrateMbps)
-            .putExtra(EXTRA_MIC, s.mic)
             .putExtra(EXTRA_CODEC, s.codec)
+            .putExtra(EXTRA_AUDIO, s.audioOn)
+            .putExtra(EXTRA_ASRC, s.audioSource)
+            .putExtra(EXTRA_ARATE, s.sampleRate)
+            .putExtra(EXTRA_ACH, s.channels)
+            .putExtra(EXTRA_ACODEC, s.audioCodec)
         ContextCompat.startForegroundService(this, i)
         moveTaskToBack(true) // langsung kembali ke game/aplikasi sebelumnya
     }
