@@ -13,7 +13,7 @@ Perekam layar minimalis untuk Android 11 (API 30) sampai Android 16 (API 36).
 - UI hanya aktif saat aplikasi dibuka; saat merekam, aplikasi langsung ke latar belakang.
 
 ## Fitur
-Resolusi (480p/720p/1080p/asli), 30/60 fps, bitrate 4-16 Mbps, mikrofon opsional.
+Resolusi (480p/720p/1080p/asli), 30/60/90/120 fps, bitrate 4-16 Mbps, mikrofon opsional.
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
 
 ## Catatan Android 14-16
