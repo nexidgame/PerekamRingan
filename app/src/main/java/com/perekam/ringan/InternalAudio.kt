@@ -32,6 +32,7 @@ class InternalAudioRecorder(
     private val mixMic: Boolean = false,
     private val gameGain: Float = 1f,
     private val micGain: Float = 1f,
+    private val audioKbps: Int = 128,
 ) {
     private var record: AudioRecord? = null
     private var micRecord: AudioRecord? = null
@@ -105,8 +106,12 @@ class InternalAudioRecorder(
     }
 
     private fun createCodec(profile: Int): MediaCodec {
-        var bitrate = if (channels == 2) 192_000 else 128_000
-        if (profile == MediaCodecInfo.CodecProfileLevel.AACObjectHE) bitrate /= 2
+        val codecIdx = when (profile) {
+            MediaCodecInfo.CodecProfileLevel.AACObjectELD -> 1
+            MediaCodecInfo.CodecProfileLevel.AACObjectHE -> 2
+            else -> 0
+        }
+        val bitrate = effectiveAudioBitrate(audioKbps, channels, sampleRate, codecIdx)
         val fmt = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels).apply {
             setInteger(MediaFormat.KEY_AAC_PROFILE, profile)
             setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
@@ -305,4 +310,20 @@ private fun findTrack(ex: MediaExtractor, prefix: String): Int {
         if (mime != null && mime.startsWith(prefix)) return i
     }
     return -1
+}
+
+/**
+ * Bitrate audio (bps) yang dipakai: pilihan pengguna, dibatasi ke batas encoder AAC
+ * (sekitar 6144 bit per saluran per frame) agar encoder tidak menolak. Contoh: mono 320 Kbps
+ * melebihi batas AAC-LC sehingga diturunkan otomatis.
+ * [audioCodec]: 0 = AAC-LC, 1 = AAC_ELD, 2 = HE-AAC.
+ */
+fun effectiveAudioBitrate(kbps: Int, channels: Int, sampleRate: Int, audioCodec: Int): Int {
+    val perChannelMax = when (audioCodec) {
+        2 -> 6144.0 * (sampleRate / 2.0) / 1024.0 // HE-AAC: inti memakai separuh sample rate
+        1 -> 6144.0 * sampleRate / 512.0          // AAC_ELD
+        else -> 6144.0 * sampleRate / 1024.0      // AAC-LC
+    }
+    val max = (perChannelMax * channels * 0.98).toInt()
+    return minOf(kbps * 1000, max)
 }
