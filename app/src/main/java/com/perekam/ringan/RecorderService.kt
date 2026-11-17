@@ -55,6 +55,7 @@ const val EXTRA_ASRC = "asrc"
 const val EXTRA_ARATE = "arate"
 const val EXTRA_ACH = "ach"
 const val EXTRA_ACODEC = "acodec"
+const val EXTRA_ABR = "abr"
 const val EXTRA_GVOL = "gvol"
 const val EXTRA_MVOL = "mvol"
 
@@ -133,6 +134,7 @@ class RecorderService : Service() {
             val sampleRate = intent.getIntExtra(EXTRA_ARATE, 44100)
             val channels = intent.getIntExtra(EXTRA_ACH, 1)
             val acodec = intent.getIntExtra(EXTRA_ACODEC, 0)
+            val abr = intent.getIntExtra(EXTRA_ABR, 128)
             val gameGain = intent.getIntExtra(EXTRA_GVOL, 100) / 100f
             val micGain = intent.getIntExtra(EXTRA_MVOL, 100) / 100f
 
@@ -160,7 +162,7 @@ class RecorderService : Service() {
             if (internal) {
                 val aTmp = File(cacheDir, "audio_$name.m4a")
                 val cand = InternalAudioRecorder(
-                    proj, sampleRate, channels, acodec, aTmp, mixMic, gameGain, micGain,
+                    proj, sampleRate, channels, acodec, aTmp, mixMic, gameGain, micGain, abr,
                 )
                 try {
                     cand.prepare()
@@ -202,13 +204,13 @@ class RecorderService : Service() {
             }
 
             fun build(w: Int, h: Int): MediaRecorder = try {
-                newRecorder(w, h, fps, mbps, useHevc, micSource, sampleRate, channels, encoder, outPath, fd.fileDescriptor)
+                newRecorder(w, h, fps, mbps, useHevc, micSource, sampleRate, channels, encoder, abr, outPath, fd.fileDescriptor)
             } catch (e: Exception) {
                 if (micSource == null) throw e
                 Toast.makeText(this, "Pengaturan audio tidak didukung, memakai MIC + AAC", Toast.LENGTH_LONG).show()
                 newRecorder(
                     w, h, fps, mbps, useHevc, MediaRecorder.AudioSource.MIC, sampleRate, channels,
-                    MediaRecorder.AudioEncoder.AAC, outPath, fd.fileDescriptor,
+                    MediaRecorder.AudioEncoder.AAC, abr, outPath, fd.fileDescriptor,
                 )
             }
 
@@ -242,7 +244,7 @@ class RecorderService : Service() {
 
     private fun newRecorder(
         vw: Int, vh: Int, fps: Int, mbps: Int, hevc: Boolean,
-        micSource: Int?, sampleRate: Int, channels: Int, audioEncoder: Int,
+        micSource: Int?, sampleRate: Int, channels: Int, audioEncoder: Int, audioKbps: Int,
         outPath: String?, outFd: FileDescriptor,
     ): MediaRecorder {
         val mr = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this)
@@ -258,9 +260,12 @@ class RecorderService : Service() {
                 mr.setAudioEncoder(audioEncoder)
                 mr.setAudioChannels(channels)
                 mr.setAudioSamplingRate(sampleRate)
-                var br = if (channels == 2) 192_000 else 128_000
-                if (audioEncoder == MediaRecorder.AudioEncoder.HE_AAC) br /= 2
-                mr.setAudioEncodingBitRate(br)
+                val codecIdx = when (audioEncoder) {
+                    MediaRecorder.AudioEncoder.AAC_ELD -> 1
+                    MediaRecorder.AudioEncoder.HE_AAC -> 2
+                    else -> 0
+                }
+                mr.setAudioEncodingBitRate(effectiveAudioBitrate(audioKbps, channels, sampleRate, codecIdx))
             }
             mr.setVideoSize(vw, vh)
             mr.setVideoFrameRate(fps)
