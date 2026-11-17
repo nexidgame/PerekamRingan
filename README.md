@@ -16,7 +16,8 @@ Perekam layar minimalis untuk Android 11 (API 30) sampai Android 16 (API 36).
 Resolusi (480p/720p/1080p/asli), 30/60/90/120 fps, bitrate 4-16 Mbps,
 codec H.264 atau H.265 (otomatis kembali ke H.264 jika HP tidak mendukung H.265),
 audio opsional dengan pilihan:
-- Sumber suara: MIC, Raw (tanpa terproses), Performa Suara, atau Suara Internal
+- Sumber suara: MIC, Raw (tanpa terproses), Performa Suara, Suara Internal, atau Internal + MIC
+  (suara game dan mikrofon dicampur, dengan pengaturan volume masing-masing 0-200%)
 - Tingkat sampel: 44100 Hz atau 48000 Hz
 - Saluran: mono atau stereo
 - Enkoder: AAC, AAC_ELD, atau HE-AAC
