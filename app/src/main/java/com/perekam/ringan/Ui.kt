@@ -238,15 +238,6 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) ->
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Tanpa overlay dan widget melayang, jadi game tetap lancar. " +
-                    "Untuk beban paling ringan pilih 720p, 30 fps. " +
-                    "Hasil disimpan di Movies/Perekam.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
             Spacer(Modifier.height(32.dp))
         }
     }
