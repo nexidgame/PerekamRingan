@@ -234,6 +234,17 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) ->
                             listOf("AAC" to 0, "AAC_ELD" to 1, "HE-AAC" to 2),
                             s.audioCodec, !recording,
                         ) { update(s.copy(audioCodec = it)) }
+                        Option(
+                            "Bit rata-rata audio",
+                            listOf("64 Kbps" to 64, "128 Kbps" to 128, "256 Kbps" to 256, "320 Kbps" to 320),
+                            s.audioBitrate, !recording,
+                        ) { update(s.copy(audioBitrate = it)) }
+                        Text(
+                            "Otomatis diturunkan jika melebihi batas encoder " +
+                                "(misalnya mono tidak mencapai 320 Kbps).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
