@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,10 +25,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -46,11 +50,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 private val Red = Color(0xFFE53935)
 
@@ -181,11 +187,14 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) ->
                         Switch(s.audioOn, { update(s.copy(audioOn = it)) }, enabled = !recording)
                     }
                     if (s.audioOn) {
-                        Option(
+                        RadioGroup(
                             "Sumber suara",
                             listOf(
-                                "MIC" to SRC_MIC, "Raw" to SRC_RAW,
-                                "Performa" to SRC_PERF, "Internal" to SRC_INTERNAL,
+                                "MIC" to SRC_MIC,
+                                "Raw (tanpa terproses)" to SRC_RAW,
+                                "Performa Suara" to SRC_PERF,
+                                "Suara Internal" to SRC_INTERNAL,
+                                "Internal + MIC" to SRC_INTERNAL_MIC,
                             ),
                             s.audioSource, !recording,
                         ) { update(s.copy(audioSource = it)) }
@@ -195,11 +204,21 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) ->
                                 SRC_PERF -> "Performa Suara: mikrofon dengan latensi rendah."
                                 SRC_INTERNAL -> "Suara Internal: merekam suara dari HP (game/media), bukan mikrofon. " +
                                     "Sebagian aplikasi memblokirnya, dan video disatukan saat berhenti."
+                                SRC_INTERNAL_MIC -> "Internal + MIC: suara game dan mikrofon dicampur. " +
+                                    "Pakai earphone agar suara game tidak terekam dua kali lewat mikrofon."
                                 else -> "MIC: mikrofon standar."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (s.audioSource == SRC_INTERNAL_MIC) {
+                            VolumeSlider("Volume suara game", s.gameVolume, !recording) {
+                                update(s.copy(gameVolume = it))
+                            }
+                            VolumeSlider("Volume mikrofon", s.micVolume, !recording) {
+                                update(s.copy(micVolume = it))
+                            }
+                        }
                         Option(
                             "Tingkat sampel audio",
                             listOf("44100 Hz" to 44100, "48000 Hz" to 48000),
@@ -249,6 +268,64 @@ private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
                 .size(size)
                 .clip(RoundedCornerShape(corner))
                 .background(Red),
+        )
+    }
+}
+
+@Composable
+private fun <T> RadioGroup(
+    title: String,
+    options: List<Pair<String, T>>,
+    selected: T,
+    enabled: Boolean,
+    onSelect: (T) -> Unit,
+) {
+    Column {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        options.forEach { (label, value) ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .selectable(
+                        selected = value == selected,
+                        enabled = enabled,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(value) },
+                    )
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = value == selected, onClick = null, enabled = enabled)
+                Spacer(Modifier.width(8.dp))
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolumeSlider(label: String, value: Int, enabled: Boolean, onChange: (Int) -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text("$value%", style = MaterialTheme.typography.labelLarge)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = 0f..200f,
+            steps = 19,
+            enabled = enabled,
         )
     }
 }
