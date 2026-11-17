@@ -10,15 +10,17 @@ import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.media.MediaRecorder
 import android.media.projection.MediaProjection
 import java.io.File
 import java.io.FileDescriptor
 import java.nio.ByteBuffer
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Merekam suara internal HP (suara game/media) lewat AudioPlaybackCapture,
- * lalu dienkode ke AAC dan disimpan ke berkas .m4a sementara.
+ * opsional dicampur dengan mikrofon, lalu dienkode ke AAC dan disimpan ke berkas .m4a sementara.
  * Berkas ini digabung dengan video saat rekaman berhenti.
  */
 class InternalAudioRecorder(
@@ -27,8 +29,12 @@ class InternalAudioRecorder(
     private val channels: Int,
     private val audioCodec: Int, // 0 = AAC, 1 = AAC_ELD, 2 = HE-AAC
     private val outFile: File,
+    private val mixMic: Boolean = false,
+    private val gameGain: Float = 1f,
+    private val micGain: Float = 1f,
 ) {
     private var record: AudioRecord? = null
+    private var micRecord: AudioRecord? = null
     private var codec: MediaCodec? = null
     private var muxer: MediaMuxer? = null
     private var thread: Thread? = null
@@ -38,6 +44,10 @@ class InternalAudioRecorder(
 
     /** true jika ada data audio yang benar-benar tertulis. */
     @Volatile var hasAudio = false
+        private set
+
+    /** true jika mikrofon diminta tetapi gagal dibuka (suara internal tetap direkam). */
+    @Volatile var micFailed = false
         private set
 
     @SuppressLint("MissingPermission")
@@ -62,6 +72,23 @@ class InternalAudioRecorder(
             .build()
         record = rec
         if (rec.state != AudioRecord.STATE_INITIALIZED) error("AudioRecord gagal dibuat")
+
+        if (mixMic) {
+            try {
+                val m = AudioRecord.Builder()
+                    .setAudioSource(MediaRecorder.AudioSource.MIC)
+                    .setAudioFormat(format)
+                    .setBufferSizeInBytes(bufSize * 2)
+                    .build()
+                if (m.state != AudioRecord.STATE_INITIALIZED) {
+                    m.release()
+                    error("Mikrofon gagal dibuka")
+                }
+                micRecord = m
+            } catch (e: Exception) {
+                micFailed = true
+            }
+        }
 
         val wanted = when (audioCodec) {
             1 -> MediaCodecInfo.CodecProfileLevel.AACObjectELD
@@ -99,6 +126,7 @@ class InternalAudioRecorder(
     fun start() {
         running = true
         record?.startRecording()
+        micRecord?.startRecording()
         thread = Thread { loop() }.also { it.start() }
     }
 
@@ -113,6 +141,9 @@ class InternalAudioRecorder(
         try { record?.stop() } catch (e: Exception) { }
         record?.release()
         record = null
+        try { micRecord?.stop() } catch (e: Exception) { }
+        micRecord?.release()
+        micRecord = null
         try { codec?.stop() } catch (e: Exception) { }
         codec?.release()
         codec = null
@@ -120,12 +151,38 @@ class InternalAudioRecorder(
         muxer = null
     }
 
+    /** Membaca suara game dan mikrofon dengan jumlah yang sama, lalu mencampurnya (dengan pembatas). */
+    private fun readMixed(
+        game: AudioRecord, mic: AudioRecord, out: ByteBuffer, want: Int,
+        gb: ByteArray, mb: ByteArray,
+    ): Int {
+        val n = game.read(gb, 0, want)
+        if (n <= 0) return n
+        var m = mic.read(mb, 0, n)
+        if (m < 0) m = 0
+        if (m < n) java.util.Arrays.fill(mb, m, n, 0.toByte())
+        var i = 0
+        while (i + 1 < n) {
+            val g = (gb[i].toInt() and 0xFF) or (gb[i + 1].toInt() shl 8)
+            val mv = (mb[i].toInt() and 0xFF) or (mb[i + 1].toInt() shl 8)
+            val v = (g * gameGain + mv * micGain).roundToInt().coerceIn(-32768, 32767)
+            out.put(i, (v and 0xFF).toByte())
+            out.put(i + 1, ((v shr 8) and 0xFF).toByte())
+            i += 2
+        }
+        return n - (n % 2)
+    }
+
     private fun loop() {
         val rec = record ?: return
+        val mic = micRecord
         val c = codec ?: return
         val mux = muxer ?: return
         val info = MediaCodec.BufferInfo()
         val bytesPerFrame = 2 * channels
+        val chunkMax = (bufSize / bytesPerFrame) * bytesPerFrame
+        val gameBytes = ByteArray(chunkMax)
+        val micBytes = ByteArray(chunkMax)
         var totalFrames = 0L
         var inputDone = false
         var outputDone = false
@@ -144,7 +201,12 @@ class InternalAudioRecorder(
                                 c.queueInputBuffer(idx, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                                 inputDone = true
                             } else {
-                                val n = rec.read(ib, minOf(ib.capacity(), bufSize))
+                                val want = (minOf(ib.capacity(), chunkMax) / bytesPerFrame) * bytesPerFrame
+                                val n = if (mic != null) {
+                                    readMixed(rec, mic, ib, want, gameBytes, micBytes)
+                                } else {
+                                    rec.read(ib, want)
+                                }
                                 if (n > 0) {
                                     c.queueInputBuffer(idx, 0, n, pts, 0)
                                     totalFrames += n / bytesPerFrame
