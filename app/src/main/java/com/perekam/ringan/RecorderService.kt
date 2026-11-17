@@ -55,6 +55,8 @@ const val EXTRA_ASRC = "asrc"
 const val EXTRA_ARATE = "arate"
 const val EXTRA_ACH = "ach"
 const val EXTRA_ACODEC = "acodec"
+const val EXTRA_GVOL = "gvol"
+const val EXTRA_MVOL = "mvol"
 
 class RecorderService : Service() {
 
@@ -87,13 +89,14 @@ class RecorderService : Service() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         val src = intent.getIntExtra(EXTRA_ASRC, SRC_MIC)
-        val internal = audioOn && src == SRC_INTERNAL
-        val micOk = audioOn && !internal
+        val internal = audioOn && (src == SRC_INTERNAL || src == SRC_INTERNAL_MIC)
+        val mixMic = audioOn && src == SRC_INTERNAL_MIC
+        val micOk = audioOn && !internal // mikrofon lewat MediaRecorder
 
         // Android 14+: foreground service bertipe mediaProjection harus aktif
         // sebelum getMediaProjection() dipanggil.
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-        if (micOk) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        if (micOk || mixMic) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         createChannel()
         ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(), type)
 
@@ -130,6 +133,8 @@ class RecorderService : Service() {
             val sampleRate = intent.getIntExtra(EXTRA_ARATE, 44100)
             val channels = intent.getIntExtra(EXTRA_ACH, 1)
             val acodec = intent.getIntExtra(EXTRA_ACODEC, 0)
+            val gameGain = intent.getIntExtra(EXTRA_GVOL, 100) / 100f
+            val micGain = intent.getIntExtra(EXTRA_MVOL, 100) / 100f
 
             val name = "Rec_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val values = ContentValues().apply {
@@ -154,11 +159,18 @@ class RecorderService : Service() {
             var ia: InternalAudioRecorder? = null
             if (internal) {
                 val aTmp = File(cacheDir, "audio_$name.m4a")
-                val cand = InternalAudioRecorder(proj, sampleRate, channels, acodec, aTmp)
+                val cand = InternalAudioRecorder(
+                    proj, sampleRate, channels, acodec, aTmp, mixMic, gameGain, micGain,
+                )
                 try {
                     cand.prepare()
                     ia = cand
                     audioTmp = aTmp
+                    if (cand.micFailed) {
+                        Toast.makeText(
+                            this, "Mikrofon gagal dibuka, merekam suara internal saja", Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 } catch (e: Exception) {
                     cand.release()
                     aTmp.delete()
