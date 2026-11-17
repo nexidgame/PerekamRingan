@@ -21,6 +21,7 @@ audio opsional dengan pilihan:
 - Tingkat sampel: 44100 Hz atau 48000 Hz
 - Saluran: mono atau stereo
 - Enkoder: AAC, AAC_ELD, atau HE-AAC
+- Bit rata-rata audio: 64, 128, 256, atau 320 Kbps (otomatis diturunkan jika melebihi batas encoder)
 Jika kombinasi audio tidak didukung HP, aplikasi otomatis memakai AAC (dan MIC untuk sumber mikrofon).
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
 
