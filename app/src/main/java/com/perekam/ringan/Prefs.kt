@@ -20,6 +20,7 @@ data class RecSettings(
     val sampleRate: Int = 44100, // 44100 / 48000
     val channels: Int = 1,       // 1 = mono, 2 = stereo
     val audioCodec: Int = 0,     // 0 = AAC, 1 = AAC_ELD, 2 = HE-AAC
+    val audioBitrate: Int = 128, // Kbps: 64 / 128 / 256 / 320
     val gameVolume: Int = 100,   // persen, khusus Internal + MIC
     val micVolume: Int = 100,    // persen, khusus Internal + MIC
 )
@@ -39,6 +40,7 @@ object Prefs {
             sampleRate = s.getInt("audio_rate", 44100),
             channels = s.getInt("audio_ch", 1),
             audioCodec = s.getInt("audio_codec", 0),
+            audioBitrate = s.getInt("audio_kbps", 128),
             gameVolume = s.getInt("vol_game", 100),
             micVolume = s.getInt("vol_mic", 100),
         )
@@ -61,6 +63,7 @@ object Prefs {
             .putInt("audio_rate", r.sampleRate)
             .putInt("audio_ch", r.channels)
             .putInt("audio_codec", r.audioCodec)
+            .putInt("audio_kbps", r.audioBitrate)
             .putInt("vol_game", r.gameVolume)
             .putInt("vol_mic", r.micVolume)
             .apply()
