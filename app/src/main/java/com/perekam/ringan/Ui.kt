@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.SystemClock
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +26,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -187,7 +188,7 @@ fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onFloating: (Boolean) ->
                         Switch(s.audioOn, { update(s.copy(audioOn = it)) }, enabled = !recording)
                     }
                     if (s.audioOn) {
-                        RadioGroup(
+                        StackedOption(
                             "Sumber suara",
                             listOf(
                                 "MIC" to SRC_MIC,
@@ -273,7 +274,7 @@ private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun <T> RadioGroup(
+private fun <T> StackedOption(
     title: String,
     options: List<Pair<String, T>>,
     selected: T,
@@ -286,24 +287,37 @@ private fun <T> RadioGroup(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(4.dp))
-        options.forEach { (label, value) ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .selectable(
-                        selected = value == selected,
-                        enabled = enabled,
-                        role = Role.RadioButton,
-                        onClick = { onSelect(value) },
+        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { (label, value) ->
+                val isSelected = value == selected
+                val shape = RoundedCornerShape(50)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .alpha(if (enabled) 1f else 0.5f)
+                        .clip(shape)
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else Color.Transparent,
+                        )
+                        .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+                        .selectable(
+                            selected = isSelected,
+                            enabled = enabled,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(value) },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                        else MaterialTheme.colorScheme.onSurface,
                     )
-                    .padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = value == selected, onClick = null, enabled = enabled)
-                Spacer(Modifier.width(8.dp))
-                Text(label, style = MaterialTheme.typography.bodyLarge)
+                }
             }
         }
     }
