@@ -123,7 +123,7 @@ class OverlayService : Service() {
 
     private fun show() {
         if (view != null || !Settings.canDrawOverlays(this)) return
-        val size = dp(28)
+        val size = dp(20)
         val v = View(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
