@@ -128,7 +128,7 @@ class OverlayService : Service() {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.argb(180, 229, 57, 53))
-                setStroke(dp(1), Color.WHITE)
+                setStroke(dp(2), Color.WHITE)
             }
             elevation = dp(4).toFloat()
             contentDescription = "Mulai rekam"
