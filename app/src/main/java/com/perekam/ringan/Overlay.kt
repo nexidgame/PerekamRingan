@@ -123,12 +123,12 @@ class OverlayService : Service() {
 
     private fun show() {
         if (view != null || !Settings.canDrawOverlays(this)) return
-        val size = dp(15)
+        val size = dp(20)
         val v = View(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.argb(150, 229, 57, 53))
-                setStroke(dp(2), Color.WHITE)
+                setColor(Color.argb(180, 229, 57, 53))
+                setStroke(dp(1), Color.WHITE)
             }
             elevation = dp(4).toFloat()
             contentDescription = "Mulai rekam"
