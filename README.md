@@ -25,6 +25,13 @@ audio opsional dengan pilihan:
 Jika kombinasi audio tidak didukung HP, aplikasi otomatis memakai AAC (dan MIC untuk sumber mikrofon).
 Video tersimpan di Movies/Perekam lewat MediaStore (tanpa izin penyimpanan).
 
+## Tampilan
+Empat tab di bagian bawah:
+- **Rekam**: tombol rekam, timer, ringkasan pengaturan, dan saklar tombol melayang.
+- **Video**: resolusi, frame rate, bitrate, dan codec.
+- **Audio**: sumber dan volume, serta kualitas audio.
+- **Pengaturan**: tentang aplikasi dan pengembalian pengaturan awal.
+
 ## Tombol rekam melayang
 Aktifkan saklar "Tombol rekam melayang" di aplikasi (butuh izin "Tampil di atas aplikasi lain").
 Tombol merah muncul di tengah layar dan bisa digeser. Ketuk untuk mulai merekam; tombol langsung
