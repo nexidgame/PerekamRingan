@@ -123,11 +123,11 @@ class OverlayService : Service() {
 
     private fun show() {
         if (view != null || !Settings.canDrawOverlays(this)) return
-        val size = dp(20)
+        val size = dp(44)
         val v = View(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.argb(180, 229, 57, 53))
+                setColor(Color.argb(230, 229, 57, 53))
                 setStroke(dp(2), Color.WHITE)
             }
             elevation = dp(4).toFloat()
