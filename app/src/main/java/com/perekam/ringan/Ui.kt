@@ -199,7 +199,8 @@ private fun RecordTab(
         }
         Text(
             "Tombol merah di tengah layar. Ketuk untuk mulai merekam, lalu tombol hilang. " +
-                "Berhenti lewat tombol di notifikasi. Tombol bisa digeser.",
+                "Berhenti lewat tombol di notifikasi. Tombol bisa digeser; seret ke ikon tempat sampah " +
+                "yang muncul di bawah layar untuk menghapusnya.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
