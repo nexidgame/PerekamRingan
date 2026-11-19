@@ -34,7 +34,9 @@ Empat tab di bagian bawah:
 
 ## Tombol rekam melayang
 Aktifkan saklar "Tombol rekam melayang" di aplikasi (butuh izin "Tampil di atas aplikasi lain").
-Tombol merah muncul di tengah layar dan bisa digeser. Ketuk untuk mulai merekam; tombol langsung
+Tombol merah muncul di tengah layar dan bisa digeser. Saat digeser, ikon tempat sampah muncul di
+bagian bawah layar; lepaskan tombol di atasnya untuk menghapus (mematikan) tombol melayang, lalu
+aktifkan lagi lewat saklar di tab Rekam. Ketuk untuk mulai merekam; tombol langsung
 hilang sehingga tidak ikut terekam, dan muncul lagi setelah rekaman selesai disimpan.
 Berhenti lewat tombol Berhenti di notifikasi. Android tetap menampilkan dialog izin rekam layar
 setiap kali rekaman dimulai.
