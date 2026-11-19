@@ -7,10 +7,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionManager
@@ -21,10 +25,12 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationCompat
@@ -83,6 +89,7 @@ class OverlayService : Service() {
     private lateinit var wm: WindowManager
     private lateinit var lp: WindowManager.LayoutParams
     private var view: View? = null
+    private var trashView: TrashView? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val handler = Handler(Looper.getMainLooper())
 
@@ -164,11 +171,28 @@ class OverlayService : Service() {
                         lp.x = startX + dx.roundToInt()
                         lp.y = startY + dy.roundToInt()
                         try { wm.updateViewLayout(v, lp) } catch (ex: Exception) { }
+                        // Ikon tempat sampah hanya muncul saat tombol digeser.
+                        showTrash()
+                        val over = overTrash(e.rawX, e.rawY)
+                        trashView?.activate(over)
+                        v.alpha = if (over) 0.6f else 1f
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) onTap()
+                    if (!moved) {
+                        onTap()
+                    } else {
+                        val dropped = overTrash(e.rawX, e.rawY)
+                        hideTrash()
+                        v.alpha = 1f
+                        if (dropped) dismissByDrag()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    hideTrash()
+                    v.alpha = 1f
                     true
                 }
                 else -> false
@@ -183,8 +207,59 @@ class OverlayService : Service() {
     }
 
     private fun hide() {
+        hideTrash()
         view?.let { try { wm.removeView(it) } catch (e: Exception) { } }
         view = null
+    }
+
+    private fun showTrash() {
+        if (trashView != null) return
+        val size = dp(64)
+        val t = TrashView(this)
+        val tlp = WindowManager.LayoutParams(
+            size, size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(56)
+        }
+        try {
+            wm.addView(t, tlp)
+            trashView = t
+        } catch (e: Exception) {
+            // izin overlay dicabut atau ditolak sistem
+        }
+    }
+
+    private fun hideTrash() {
+        trashView?.let { try { wm.removeView(it) } catch (e: Exception) { } }
+        trashView = null
+    }
+
+    /** true jika jari berada di atas ikon tempat sampah (koordinat layar). */
+    private fun overTrash(x: Float, y: Float): Boolean {
+        val t = trashView ?: return false
+        if (t.width == 0) return false
+        val loc = IntArray(2)
+        t.getLocationOnScreen(loc)
+        val cx = loc[0] + t.width / 2f
+        val cy = loc[1] + t.height / 2f
+        val r = t.width * 0.9f
+        val dx = x - cx
+        val dy = y - cy
+        return dx * dx + dy * dy <= r * r
+    }
+
+    /** Tombol dilepas di atas tempat sampah: matikan tombol melayang. */
+    private fun dismissByDrag() {
+        hide()
+        OverlayState.enabled.value = false
+        Prefs.setFloating(this, false)
+        Toast.makeText(this, "Tombol melayang dimatikan. Aktifkan lagi di tab Rekam.", Toast.LENGTH_LONG).show()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun onTap() {
@@ -272,5 +347,49 @@ class QuickStartActivity : ComponentActivity() {
     private fun askProjection() {
         val mpm = getSystemService(MediaProjectionManager::class.java)
         projectionLauncher.launch(mpm.createScreenCaptureIntent())
+    }
+}
+
+/** Ikon tempat sampah bulat yang digambar sendiri; membesar dan memerah saat tombol berada di atasnya. */
+private class TrashView(context: Context) : View(context) {
+    private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val fg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        color = Color.WHITE
+    }
+    private var active = false
+
+    fun activate(on: Boolean) {
+        if (on == active) return
+        active = on
+        if (on) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        animate().scaleX(if (on) 1.25f else 1f).scaleY(if (on) 1.25f else 1f).setDuration(120).start()
+        invalidate()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        bg.color = if (active) Color.argb(235, 229, 57, 53) else Color.argb(210, 40, 40, 44)
+        canvas.drawCircle(w / 2f, h / 2f, w / 2f, bg)
+        fg.strokeWidth = w * 0.06f
+        // tutup dan gagang
+        canvas.drawLine(w * 0.30f, h * 0.35f, w * 0.70f, h * 0.35f, fg)
+        canvas.drawLine(w * 0.42f, h * 0.35f, w * 0.42f, h * 0.29f, fg)
+        canvas.drawLine(w * 0.58f, h * 0.35f, w * 0.58f, h * 0.29f, fg)
+        canvas.drawLine(w * 0.42f, h * 0.29f, w * 0.58f, h * 0.29f, fg)
+        // badan
+        val body = Path().apply {
+            moveTo(w * 0.35f, h * 0.40f)
+            lineTo(w * 0.38f, h * 0.72f)
+            lineTo(w * 0.62f, h * 0.72f)
+            lineTo(w * 0.65f, h * 0.40f)
+        }
+        canvas.drawPath(body, fg)
+        // garis isi
+        canvas.drawLine(w * 0.46f, h * 0.47f, w * 0.46f, h * 0.65f, fg)
+        canvas.drawLine(w * 0.54f, h * 0.47f, w * 0.54f, h * 0.65f, fg)
     }
 }
